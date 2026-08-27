@@ -461,7 +461,7 @@ const handler = async (
 // ==========================================
 
 handler.help = [
-    '',
+    'صوت_القران',
     'quran'
 ]
 
@@ -471,7 +471,7 @@ handler.tags = [
 ]
 
 handler.command =
-    /^(ww|قرآن|quran|quransurah(1[0-1][0-9]|[1-9][0-9]))$/i
+    /^(صوت_القران|quran|quransurah(1[0-1][0-9]|[1-9][0-9]))$/i
 
 handler.limit = false
 handler.register = false
