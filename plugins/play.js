@@ -1,88 +1,173 @@
-//تـرجـمـة وتـعـديـل: نـورديـن
-//بـلـوغـيـن: Izuku-mi | بـدون مـكـتـبـات + مـتـعـدد API + قـنـاة
 
-const handler = async (m, { text, conn }) => {
+import yts from 'yt-search';
+
+// ==========================================
+// معلومات قناة البوت
+// ==========================================
+
+const channelName = '𝗝𝗜𝗧𝗢𝗦𝗦𝗔 𝗕𝗢𝗧 🇲🇦';
+const channelId = '120363410733859643@newsletter';
+
+// ==========================================
+// معلومات القناة
+// ==========================================
+
+const channelInfo = {
+    isForwarded: true,
+    forwardingScore: 1,
+
+    forwardedNewsletterMessageInfo: {
+        newsletterJid: channelId,
+        newsletterName: channelName,
+        serverMessageId: -1
+    }
+};
+
+// ==========================================
+// البحث عن الأغاني
+// ==========================================
+
+let handler = async (m, { usedPrefix, command, text, conn }) => {
+
+    // ==========================================
+    // رسالة الاستعمال
+    // ==========================================
+
+    if (!text) {
+        await conn.sendMessage(
+            m.chat,
+            {
+                text:
+`📥 *الـرجـاء إدخـال اســم الأغـنـية وسـأقـوم بـتحـمله لـك فــوراً*
+
+*📌 مـثـال :* ${usedPrefix}تحميل_اغنية سـورة الـبقـرة`,
+
+                contextInfo: channelInfo
+            },
+            { quoted: m }
+        );
+
+        return;
+    }
+
+    await m.react('🌟');
+
     try {
-        // ===== مـعـلـومـات الـقـنـاة =====
-        const channelName = '𝗝𝗜𝗧𝗢𝗦𝗦𝗔 𝗕𝗢𝗧 🇲🇦'
-        const newsletter = {
-            forwardingScore: 999,
-            isForwarded: true,
-            forwardedNewsletterMessageInfo: {
-                newsletterJid: '120363410733859643@newsletter', // بـدلـهـا بـ ID ديـال الـقـنـاة ديـالـك
-                newsletterName: channelName
-            }
-        }
-        // ========================
 
-        if (!text) return m.reply("📥*الـرجـاء إدخـال اســم الأغـنـية وسـأقـوم بـتحـمله لـك فــوراً*\n\n*📌 `مـثـال :* `.تحميل_اغنية سـورة الـبقـرة", m.chat, { contextInfo: newsletter })
+        // البحث
+        const search = await yts(text);
 
-        await m.react('🔍')
+        const results = search.videos.slice(0, 10);
 
-        let res, data
-        const apis = [
-            `https://api.vreden.my.id/api/ytplaymp3?query=${encodeURIComponent(text)}`,
-            `https://api.nexray.web.id/downloader/ytplay?q=${encodeURIComponent(text)}`,
-            `https://api.siputzx.my.id/api/d/ytmp3?url=https://youtube.com/search?q=${encodeURIComponent(text)}`
-        ]
+        if (!results.length) {
+            await m.react('❌');
 
-        for(let url of apis){
-            try{
-                const api = await fetch(url, { timeout: 15000 })
-                data = await api.json()
-                
-                if(url.includes('vreden') && data.status && data.result?.download?.url){
-                    res = { title: data.result.title, thumbnail: data.result.thumbnail, duration: data.result.duration, author: data.result.author, download: data.result.download.url, url: data.result.url }
-                    break
-                }
-                if(url.includes('nexray') && data.status && data.result?.download_url){
-                    res = { title: data.result.title, thumbnail: data.result.thumbnail, duration: data.result.duration, author: {name: 'غـيـر مـعـروف'}, download: data.result.download_url, url: data.result.url }
-                    break
-                }
-                if(url.includes('siputzx') && data.status && data.data?.dl){
-                    res = { title: data.data.title, thumbnail: data.data.thumbnail, duration: data.data.duration, author: {name: data.data.author}, download: data.data.dl, url: data.data.url }
-                    break
-                }
-            }catch(e){}
+            return conn.sendMessage(
+                m.chat,
+                {
+                    text: '❌ لـم يـتـم العـثـور عـلـى أي أغـنيـة.',
+                    contextInfo: channelInfo
+                },
+                { quoted: m }
+            );
         }
 
-        if (!res) return m.reply("❌ كـل الـ APIs طـايـحـيـن أو الأغـنـيـة مـاتـلـقـاتـش. جـرب مـرة خـرى", m.chat, { contextInfo: newsletter })
+        // أول نتيجة
+        const first = results[0];
 
-        await m.react('🎵')
+        // ==========================================
+        // إنشاء قائمة الأغاني
+        // ==========================================
 
-        const { title, thumbnail, duration, author, download, url } = res
+        const songs = results.map((item) => ({
+            title: item.title,
 
-        const caption = `🎵 *تــــم الـتـحـمـيـل بـنـجـاح*:
-        
-*📌 الـعـنـوان :* ${title || ""}
-*🔍 الـرابـط :* ${url || ""}
-*⏰ الـمــدة :* ${duration || ""}`
-      
-        await conn.sendMessage(m.chat, { 
-            image: { url: thumbnail }, 
-            caption,
-            contextInfo: newsletter
-        }, { quoted: m })
+            description:
+                `🕛 ${item.timestamp} | 👤 ${item.author?.name || 'Unknown'}`,
 
-        await m.react('⏳')
-        await conn.sendMessage(m.chat, { 
-            audio: { url: download }, 
-            mimetype: "audio/mpeg", 
-            fileName: `${title}.mp3`, 
-            ptt: false,
-            contextInfo: newsletter
-        }, { quoted: m })
+            id: `${usedPrefix}ytmp3 ${item.url}`
+        }));
 
-        await m.reply("✅ *تـم الـتـحـمـيـل بـنـجـاح! تـهـنـى بـالـمـوسـيـقـى 🎵*", m.chat, { contextInfo: newsletter })
-        await m.react('✅')
+        // ==========================================
+        // إرسال الصورة + القائمة
+        // ==========================================
+
+        await conn.sendButton(
+            m.chat,
+            {
+                image: { url: first.thumbnail },
+
+                caption:
+`🎵 *نـتائــج البـحـــث*
+
+🔎 البــحــث : ${text}
+
+🎧 *اخـتر الأغـنـية الـتـي تـريـد تـحـمـيلـهــا بـصـيغــة MP3 فـقــط.*`,
+
+                footer: global.namebot,
+
+                buttons: [
+                    {
+                        name: 'single_select',
+
+                        buttonParamsJson: JSON.stringify({
+                            title: '🎵 اضــغــط هـنــا',
+
+                            sections: [
+                                {
+                                    title: '🎧 اخــتـر الأغـنــية',
+
+                                    rows: songs
+                                }
+                            ]
+                        })
+                    }
+                ],
+
+                messageParamsJson: JSON.stringify({
+                    bottom_sheet: {
+                        list_title: '🎵 قــائــمــة الأغــانــي',
+                        button_title: 'اضــغــط هــنــا',
+                        in_thread_buttons_limit: 1
+                    }
+                }),
+
+                // 📢 القناة
+                contextInfo: channelInfo
+            },
+
+            { quoted: m }
+        );
+
+        await m.react('✅');
 
     } catch (e) {
-        console.error("PLAY ERROR:", e)
-        m.reply(`❌ خـطـأ: ${e.message}\nجـرب مـرة خـرى أو بـدل الأغـنـيـة`)
-    }
-}
 
-handler.command = ["play", "تحميل_اغنية"]
-handler.help = ["play <الـبـحـث>"]
-handler.tags = ["تـحـمـيـل"]
-export default handler
+        console.error(e);
+
+        await m.react('❌');
+
+        await conn.sendMessage(
+            m.chat,
+            {
+                text: `❌ حــدث خــطــأ:\n${e.message || e}`,
+                contextInfo: channelInfo
+            },
+            { quoted: m }
+        );
+    }
+};
+
+// ==========================================
+// إعدادات الأمر
+// ==========================================
+
+handler.help = ['تحميل_اغنية'];
+handler.tags = ['downloader'];
+
+handler.command =
+    /^(play|youtubesearch|تحميل_اغنية)$/i;
+
+handler.limit = false;
+
+export default handler;
