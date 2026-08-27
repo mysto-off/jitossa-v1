@@ -159,7 +159,7 @@ const handler = async (
         // ==========================================
 
         const match = command.match(
-            /^quransurah(1[0-1][0-9]|[1-9][0-9]?|0)$/i
+            /^quransurah([0-9]{1,3})$/i
         )
 
         if (match) {
@@ -471,7 +471,7 @@ handler.tags = [
 ]
 
 handler.command =
-    /^(صوت_القران|quran|quransurah(1[0-1][0-9]|[1-9][0-9]))$/i
+    /^(صوت_القران|quran|quransurah[0-9]{1,3})$/i
 
 handler.limit = false
 handler.register = false
