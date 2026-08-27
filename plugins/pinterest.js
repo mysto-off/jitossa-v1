@@ -1,13 +1,10 @@
-// NewsMA FAST plugin - 30 News + Single Select
-// بدون تصميم + بدون صورة
-// تـعـديـل : نـورديـن
 // © 𝗝𝗜𝗧𝗢𝗦𝗦𝗔 𝗕𝗢𝗧 🇲🇦
+// Pinterest Search - 7 Images + Single Select
+// Channel + اختيار صورة واحدة بدون إرسال النتائج مسبقاً
 
-const MAX_NEWS = 30
-const RSS_TIMEOUT = 7000
-const DETAIL_TIMEOUT = 7000
-const NEWS_CACHE_TIME = 60 * 1000
-const DETAIL_CACHE_TIME = 10 * 60 * 1000
+const MAX_RESULTS = 7
+const CACHE_TIME = 60 * 60 * 1000
+const SEARCH_TIMEOUT = 15000
 
 // ==========================================
 // معلومات القناة
@@ -19,6 +16,7 @@ const CHANNEL_ID = '120363410733859643@newsletter'
 const newsletter = {
     forwardingScore: 999,
     isForwarded: true,
+
     forwardedNewsletterMessageInfo: {
         newsletterJid: CHANNEL_ID,
         newsletterName: channelName
@@ -29,916 +27,741 @@ const newsletter = {
 // Cache
 // ==========================================
 
-let newsCache = {
-    data: [],
-    time: 0
+const pinterestCache = new Map()
+
+// تنظيف النتائج القديمة
+function cleanCache() {
+
+    const now = Date.now()
+
+    for (const [key, value] of pinterestCache.entries()) {
+
+        if (
+            !value ||
+            now - value.time > CACHE_TIME
+        ) {
+            pinterestCache.delete(key)
+        }
+
+    }
 }
 
-const detailCache = new Map()
+// ==========================================
+// Session
+// ==========================================
+
+async function getSession() {
+
+    const res = await fetch(
+        'https://id.pinterest.com/',
+        {
+            headers: {
+                'user-agent':
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/148.0.0.0 Safari/537.36',
+
+                'accept-language':
+                    'en-US,en;q=0.9'
+            },
+
+            signal:
+                AbortSignal.timeout(
+                    SEARCH_TIMEOUT
+                )
+        }
+    )
+
+    const cookies =
+        res.headers.getSetCookie?.() || []
+
+    const cookieHeader =
+        cookies
+            .map(c => c.split(';')[0])
+            .join('; ')
+
+    const csrf =
+        cookies
+            .find(c =>
+                c.startsWith('csrftoken=')
+            )
+            ?.match(
+                /csrftoken=([^;]+)/
+            )?.[1] || ''
+
+    return {
+        cookies: cookieHeader,
+        csrf
+    }
+}
+
+// ==========================================
+// Pinterest Search
+// ==========================================
+
+async function searchPinterest(
+    query,
+    limit = 7
+) {
+
+    const session =
+        await getSession()
+
+    const data = {
+
+        options: {
+            query,
+
+            scope: 'pins',
+
+            page_size: limit,
+
+            refine_search_with_filters: true
+        },
+
+        context: {}
+
+    }
+
+    const sourceUrl =
+        `/search/pins/?q=${encodeURIComponent(
+            query
+        )}`
+
+    const url =
+        `https://id.pinterest.com/resource/BaseSearchResource/get/?` +
+        `source_url=${encodeURIComponent(
+            sourceUrl
+        )}` +
+        `&data=${encodeURIComponent(
+            JSON.stringify(data)
+        )}` +
+        `&_=${Date.now()}`
+
+    const res =
+        await fetch(
+            url,
+            {
+                headers: {
+
+                    'accept':
+                        'application/json, text/javascript, */*, q=0.01',
+
+                    'accept-language':
+                        'en-US,en;q=0.9',
+
+                    'user-agent':
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/148.0.0.0 Safari/537.36',
+
+                    'referer':
+                        `https://id.pinterest.com${sourceUrl}`,
+
+                    'x-requested-with':
+                        'XMLHttpRequest',
+
+                    'x-app-version':
+                        '6d51d5a',
+
+                    'x-pinterest-appstate':
+                        'active',
+
+                    'x-pinterest-pws-handler':
+                        'www/search/[scope].js',
+
+                    'x-pinterest-source-url':
+                        sourceUrl,
+
+                    ...(session.csrf
+                        ? {
+                            'x-csrftoken':
+                                session.csrf
+                        }
+                        : {}),
+
+                    ...(session.cookies
+                        ? {
+                            cookie:
+                                session.cookies
+                        }
+                        : {})
+                },
+
+                signal:
+                    AbortSignal.timeout(
+                        SEARCH_TIMEOUT
+                    )
+            }
+        )
+
+    if (!res.ok) {
+
+        throw new Error(
+            `HTTP ${res.status}`
+        )
+    }
+
+    const json =
+        await res.json()
+
+    const payload =
+        json?.resource_response?.data
+
+    if (!payload) {
+        return []
+    }
+
+    const results =
+        Array.isArray(payload)
+            ? payload
+            : payload.results || []
+
+    return results
+
+        .filter(
+            pin => pin?.id
+        )
+
+        .map(pin => ({
+
+            title:
+                pin.title ||
+                pin.grid_title ||
+                '',
+
+            image:
+                pin.images?.orig?.url ||
+                pin.images?.['736x']?.url ||
+                pin.images?.['564x']?.url ||
+                pin.images?.['474x']?.url ||
+                null,
+
+            username:
+                pin.pinner?.username ||
+                '',
+
+            fullName:
+                pin.pinner?.full_name ||
+                '',
+
+            url:
+                `https://id.pinterest.com/pin/${pin.id}/`
+
+        }))
+
+        .filter(
+            pin => pin.image
+        )
+
+        .slice(
+            0,
+            limit
+        )
+}
+
+// ==========================================
+// إنشاء ID للجلسة
+// ==========================================
+
+function createSessionId() {
+
+    return (
+        Date.now().toString(36) +
+        Math.random()
+            .toString(36)
+            .slice(2, 10)
+    )
+}
 
 // ==========================================
 // Handler
 // ==========================================
 
-const handler = async (m, { conn, usedPrefix: _p, command }) => {
+const handler = async (
+    m,
+    {
+        conn,
+        text,
+        usedPrefix,
+        command
+    }
+) => {
 
     try {
 
+        cleanCache()
+
         // ==========================================
-        // الخبر المختار
+        // اختيار الصورة
         // ==========================================
 
-        const match = command.match(
-            /^newsma([1-9]|[12][0-9]|30)$/i
-        )
+        const match =
+            command.match(
+                /^pinselect_([a-z0-9]+)_(1|2|3|4|5|6|7)$/i
+            )
 
         if (match) {
 
-            const selected = Number(match[1])
+            const sessionId =
+                match[1]
 
-            await m.react('📰')
+            const selected =
+                Number(match[2])
 
-            const news = await getMoroccoNews()
+            const cached =
+                pinterestCache.get(
+                    sessionId
+                )
 
-            if (!news[selected - 1]) {
-
-                await m.react('❌')
-
-                return conn.sendMessage(m.chat, {
-                    text:
-                        `❌ لـم يـتـم الـعـثـور عـلـى الـخـبـر رقـم ${selected}.`,
-                    contextInfo: newsletter
-                }, {
-                    quoted: m
-                })
-
-            }
-
-            const selectedNews =
-                news[selected - 1]
-
-            // ==========================================
-            // جلب التفاصيل
-            // ==========================================
-
-            const item = await getNewsDetail(
-                selectedNews.link
-            )
-
-            if (!item) {
+            if (!cached) {
 
                 await m.react('❌')
 
-                return conn.sendMessage(m.chat, {
-                    text:
-                        '❌ لـم أستطع جـلـب تـفـاصـيـل هـذا الـخـبـر.',
-                    contextInfo: newsletter
-                }, {
-                    quoted: m
-                })
+                return conn.sendMessage(
+                    m.chat,
+                    {
+                        text:
+`❌ *انـتـهـت صـلاحـيـة الـقـائـمـة.*
 
+🔄 اسـتـخـدم الأمـر مـن جـديـد.`
+                    },
+                    {
+                        quoted: m
+                    }
+                )
             }
 
+            // التأكد أن القائمة لن تكون قديمة
+            if (
+                Date.now() -
+                cached.time >
+                CACHE_TIME
+            ) {
+
+                pinterestCache.delete(
+                    sessionId
+                )
+
+                await m.react('❌')
+
+                return conn.sendMessage(
+                    m.chat,
+                    {
+                        text:
+`❌ *انـتـهـت صـلاحـيـة الـقـائـمـة.*
+
+🔄 ابـحـث مـن جـديـد.`
+                    },
+                    {
+                        quoted: m
+                    }
+                )
+            }
+
+            const pin =
+                cached.results[
+                    selected - 1
+                ]
+
+            if (!pin) {
+
+                await m.react('❌')
+
+                return conn.sendMessage(
+                    m.chat,
+                    {
+                        text:
+`❌ *لـم يـتـم الـعـثـور عـلـى الـصـورة رقـم ${selected}.*`
+                    },
+                    {
+                        quoted: m
+                    }
+                )
+            }
+
+            await m.react('📥')
+
             // ==========================================
-            // النص فقط
+            // Caption
             // ==========================================
 
-            let text = ''
+            let caption =
+`📌 *صـورة بـنـتـرست*
 
-            text += `📰 ${item.title}\n\n`
+🖼️ *رقـم الـصـورة:* ${selected}/${cached.results.length}
 
-            text += `👤 الكـاتب : ${item.author}\n\n`
+`
 
-            text += `📅 الـتاريـخ : ${item.date}\n\n`
+            if (pin.title) {
 
-            text += `🏷️ التـصـنيـف : ${item.category}\n\n`
+                caption +=
+                    `📝 *الـعـنـوان:*\n${pin.title}\n\n`
+            }
 
-            text += `📝 الـخـبر :\n`
-            text += `${item.content}\n\n`
+            if (pin.fullName) {
 
-            text += `🔗 الـرابــط :\n`
-            text += `${item.link}\n\n`
+                caption +=
+                    `👤 *الـحـسـاب:* ${pin.fullName}`
 
-            text +=
-                `📰 الــخـبر ${selected} مــن ${Math.min(
-                    MAX_NEWS,
-                    news.length
-                )} خـبــر`
+                if (pin.username) {
+
+                    caption +=
+                        ` (@${pin.username})`
+                }
+
+                caption += '\n\n'
+            }
+
+            caption +=
+`🔗 *رابـط الـصـورة:*
+${pin.url}
+
+> ${channelName}`
 
             // ==========================================
-            // إرسال النص فقط
+            // إرسال الصورة المختارة
             // ==========================================
 
-            await conn.sendMessage(m.chat, {
-                text,
-                contextInfo: newsletter
-            }, {
-                quoted: m
-            })
+            try {
 
-            await m.react('✅')
+                await conn.sendMessage(
+                    m.chat,
+                    {
+                        image: {
+                            url: pin.image
+                        },
+
+                        caption,
+
+                        contextInfo:
+                            newsletter
+                    },
+                    {
+                        quoted: m
+                    }
+                )
+
+                await m.react('✅')
+
+            } catch (e) {
+
+                console.error(
+                    'Pinterest Image Error:',
+                    e
+                )
+
+                await conn.sendMessage(
+                    m.chat,
+                    {
+                        text:
+`❌ *مـا قـدرتـش نـرسـل الـصـورة.*
+
+🔗 ${pin.url}`,
+
+                        contextInfo:
+                            newsletter
+                    },
+                    {
+                        quoted: m
+                    }
+                )
+
+                await m.react('❌')
+            }
 
             return
         }
 
         // ==========================================
-        // الأمر الرئيسي
+        // التحقق من البحث
         // ==========================================
 
-        await m.react('⏳')
+        if (!text?.trim()) {
 
-        const news =
-            await getMoroccoNews()
+            return conn.sendMessage(
+                m.chat,
+                {
+                    text:
+`📌 *طـريـقـة الاسـتـخـدام:*
 
-        if (!news.length) {
+${usedPrefix}${command} <كـلـمـة الـبـحـث>
+
+*أمـثـلـة:*
+
+• ${usedPrefix}${command} تـصـمـيـم
+• ${usedPrefix}${command} خـلـفـيـات انـمـي
+• ${usedPrefix}${command} سيارات
+• ${usedPrefix}${command} ديكور
+
+🖼️ سـيـتـم عـرض 7 صـور لـلاخـتـيـار.`,
+
+                    contextInfo:
+                        newsletter
+                },
+                {
+                    quoted: m
+                }
+            )
+        }
+
+        const query =
+            text.trim()
+
+        await m.react('🔍')
+
+        // ==========================================
+        // البحث
+        // ==========================================
+
+        let results
+
+        try {
+
+            results =
+                await searchPinterest(
+                    query,
+                    MAX_RESULTS
+                )
+
+        } catch (e) {
+
+            console.error(
+                'Pinterest Search Error:',
+                e
+            )
 
             await m.react('❌')
 
-            return conn.sendMessage(m.chat, {
-                text:
-                    '❌ لا تـوجـد أخـبـار مـتـاحـة حـالـيـاً.',
-                contextInfo: newsletter
-            }, {
-                quoted: m
-            })
+            return conn.sendMessage(
+                m.chat,
+                {
+                    text:
+`❌ *فـشـل الاتـصـال بـبـنـتـرست.*
 
+🔄 جـرب مـرة أخـرى بـعـد قـلـيـل.`,
+
+                    contextInfo:
+                        newsletter
+                },
+                {
+                    quoted: m
+                }
+            )
         }
+
+        // ==========================================
+        // لا توجد نتائج
+        // ==========================================
+
+        if (
+            !results ||
+            !results.length
+        ) {
+
+            await m.react('❌')
+
+            return conn.sendMessage(
+                m.chat,
+                {
+                    text:
+`😕 *مـا لـقـيـنـاش نـتـائـج لـ:*
+
+"${query}"
+
+🔄 جـرب كـلـمـة بـحـث خـرى.`,
+
+                    contextInfo:
+                        newsletter
+                },
+                {
+                    quoted: m
+                }
+            )
+        }
+
+        // ==========================================
+        // إنشاء جلسة
+        // ==========================================
+
+        const sessionId =
+            createSessionId()
+
+        pinterestCache.set(
+            sessionId,
+            {
+                results,
+                query,
+                time: Date.now()
+            }
+        )
 
         // ==========================================
         // Rows
         // ==========================================
 
-        const rows = news
-            .slice(0, MAX_NEWS)
-            .map((item, index) => {
+        const rows =
+            results.map(
+                (pin, index) => {
 
-                let title =
-                    String(item.title || '')
-                        .replace(/\n/g, ' ')
-                        .replace(/\s+/g, ' ')
-                        .trim()
+                    let title =
+                        String(
+                            pin.title || ''
+                        )
+                            .replace(
+                                /\n/g,
+                                ' '
+                            )
+                            .replace(
+                                /\s+/g,
+                                ' '
+                            )
+                            .trim()
 
-                if (title.length > 60) {
-                    title =
-                        title.slice(0, 57) + '...'
+                    if (!title) {
+
+                        title =
+                            'صـورة مـن بـنـتـرست'
+                    }
+
+                    if (
+                        title.length > 55
+                    ) {
+
+                        title =
+                            title.slice(
+                                0,
+                                52
+                            ) + '...'
+                    }
+
+                    return {
+
+                        title:
+                            `🖼️ الـصـورة ${index + 1}`,
+
+                        description:
+                            title,
+
+                        id:
+                            `${usedPrefix}pinselect_${sessionId}_${index + 1}`
+                    }
                 }
-
-                return {
-                    title:
-                        `🇲🇦 الـــخـبر ${index + 1}`,
-
-                    description:
-                        title,
-
-                    id:
-                        `${_p}newsma${index + 1}`
-                }
-
-            })
+            )
 
         // ==========================================
         // Sections
         // ==========================================
 
-        const sections = []
+        const sections = [
 
-        for (
-            let i = 0;
-            i < rows.length;
-            i += 10
-        ) {
+            {
+                title:
+                    `📌 نـتـائـج: ${query}`,
 
-            const part =
-                rows.slice(i, i + 10)
-
-            if (part.length) {
-
-                sections.push({
-                    title:
-                        `الأخـبـــار ${i + 1} - ${Math.min(
-                            i + 10,
-                            rows.length
-                        )}`,
-
-                    rows: part
-                })
-
+                rows
             }
 
-        }
+        ]
 
         // ==========================================
-        // نص بسيط
+        // القائمة
         // ==========================================
 
         const caption =
-`*📰 أخـــــبار المـغـــرب*
+`📌 *بـحـث بـنـتـرست*
 
-تـم جـلـب ${news.length} خـبــراً.
+🔎 *الـبـحـث:*
+${query}
 
-اضـغـط علـى الزر لاخـتيـار الـخـبر الـذي تـريـد قـراءتـه.
+🖼️ *الـنـتـائـج:* ${results.length} صـور
 
-𝗝𝗜𝗧𝗢𝗦𝗦𝗔 𝗕𝗢𝗧 🇲🇦`
+👇 اضـغـط عـلـى الـقـائـمـة واخـتـر الـصـورة الـتـي تـريـدهـا.
 
-        // ==========================================
-        // إرسال بدون صورة
-        // ==========================================
+> ${channelName}`
 
-        await conn.sendButton(m.chat, {
+        await conn.sendButton(
+            m.chat,
+            {
 
-            text: caption,
+                text:
+                    caption,
 
-            footer:
-                '𝗝𝗜𝗧𝗢𝗦𝗦𝗔 𝗕𝗢𝗧 🇲🇦',
+                footer: {
+                    text:
+                        channelName
+                },
 
-            buttons: [
+                buttons: [
 
-                {
-                    name: 'single_select',
+                    {
+                        name:
+                            'single_select',
 
-                    buttonParamsJson:
-                        JSON.stringify({
+                        buttonParamsJson:
+                            JSON.stringify({
 
-                            title:
-                                '🇲🇦 اخــتـــر الخـبـــر',
+                                title:
+                                    '🖼️ اخـتـر الـصـورة',
 
-                            sections
+                                sections
+                            })
+                    }
 
-                        })
-                }
+                ],
 
-            ],
+                headerType:
+                    1,
 
-            headerType: 1,
-
-            contextInfo: newsletter
-
-        }, {
-            quoted: m
-        })
+                contextInfo:
+                    newsletter
+            },
+            {
+                quoted: m
+            }
+        )
 
         await m.react('✅')
 
     } catch (e) {
 
         console.error(
-            'NewsMA FAST Error:',
+            'Pinterest Handler Error:',
             e
         )
 
         await m.react('❌')
 
-        await conn.sendMessage(m.chat, {
-            text:
-                `❌ خـطــأ:\n\n${e.message || 'حدث خطأ غير معروف'}`,
-            contextInfo: newsletter
-        }, {
-            quoted: m
-        })
+        await conn.sendMessage(
+            m.chat,
+            {
+                text:
+`❌ *حـدث خـطـأ غـيـر مـتـوقـع.*
 
+${e.message || 'Unknown Error'}`,
+
+                contextInfo:
+                    newsletter
+            },
+            {
+                quoted: m
+            }
+        )
     }
-
 }
 
 // ==========================================
-// الأوامر
+// Commands
 // ==========================================
 
 handler.help = [
-    'newsma',
-    'اخبار_المغرب'
+    'بينترست <النص>',
+    'pinterest <النص>'
 ]
 
 handler.tags = [
-    'morocco'
+    'tools'
 ]
 
 handler.command =
-    /^(newsma|اخبار_المغرب|newsma|newsma([1-9]|[12][0-9]|30))$/i
+    /^(بينترست|pinterest|pinselect_[a-z0-9]+_(1|2|3|4|5|6|7))$/i
 
-handler.limit = false
-handler.register = false
+handler.limit = true
 
 export default handler
-
-
-// ==========================================
-// جلب أخبار المغرب - FAST
-// ==========================================
-
-async function getMoroccoNews() {
-
-    // ==========================================
-    // Cache
-    // ==========================================
-
-    if (
-        newsCache.data.length &&
-        Date.now() - newsCache.time <
-        NEWS_CACHE_TIME
-    ) {
-
-        return newsCache.data
-
-    }
-
-    const urls = [
-        'https://www.hespress.com/rss',
-        'https://www.le360.ma/rss'
-    ]
-
-    const HEADERS = {
-
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
-
-        'Accept':
-            'application/rss+xml, application/xml, text/xml, */*'
-    }
-
-    // ==========================================
-    // جلب المصدرين معاً
-    // ==========================================
-
-    const results =
-        await Promise.allSettled(
-
-            urls.map(async url => {
-
-                const res =
-                    await fetch(url, {
-
-                        headers: HEADERS,
-
-                        signal:
-                            AbortSignal.timeout(
-                                RSS_TIMEOUT
-                            )
-
-                    })
-
-                if (!res.ok) {
-
-                    throw new Error(
-                        `HTTP ${res.status}`
-                    )
-
-                }
-
-                return res.text()
-
-            })
-
-        )
-
-    const allNews = []
-
-    // ==========================================
-    // معالجة النتائج
-    // ==========================================
-
-    for (const result of results) {
-
-        if (
-            result.status !==
-            'fulfilled'
-        ) {
-            continue
-        }
-
-        const xml = result.value
-
-        const items =
-            xml.match(
-                /<item[\s\S]*?<\/item>/gi
-            ) || []
-
-        for (const item of items) {
-
-            if (
-                allNews.length >=
-                MAX_NEWS * 2
-            ) {
-                break
-            }
-
-            const title =
-                item.match(
-                    /<title[^>]*>([\s\S]*?)<\/title>/i
-                )?.[1]
-
-            const link =
-                item.match(
-                    /<link[^>]*>([\s\S]*?)<\/link>/i
-                )?.[1]
-
-            const pubDate =
-                item.match(
-                    /<pubDate[^>]*>([\s\S]*?)<\/pubDate>/i
-                )?.[1]
-
-            if (
-                !title ||
-                !link
-            ) {
-                continue
-            }
-
-            const cleanTitle =
-                decodeHTMLEntities(
-                    cleanXML(title)
-                )
-
-            const cleanLink =
-                cleanXML(link)
-
-            if (
-                !cleanTitle ||
-                !cleanLink.startsWith('http')
-            ) {
-                continue
-            }
-
-            allNews.push({
-
-                title:
-                    cleanTitle,
-
-                link:
-                    cleanLink,
-
-                date:
-                    pubDate
-                        ? formatDate(
-                            cleanXML(pubDate)
-                        )
-                        : 'غـيـر مـتـوفـر'
-
-            })
-
-        }
-
-    }
-
-    // ==========================================
-    // إزالة التكرار
-    // ==========================================
-
-    const seen = new Set()
-
-    const unique =
-        allNews.filter(item => {
-
-            if (
-                seen.has(item.link)
-            ) {
-                return false
-            }
-
-            seen.add(item.link)
-
-            return true
-
-        })
-
-    // ==========================================
-    // ترتيب الأخبار
-    // ==========================================
-
-    unique.sort((a, b) => {
-
-        const da =
-            new Date(a.date).getTime()
-
-        const db =
-            new Date(b.date).getTime()
-
-        if (
-            isNaN(da) ||
-            isNaN(db)
-        ) {
-            return 0
-        }
-
-        return db - da
-
-    })
-
-    const finalNews =
-        unique.slice(
-            0,
-            MAX_NEWS
-        )
-
-    // ==========================================
-    // Cache
-    // ==========================================
-
-    newsCache = {
-
-        data:
-            finalNews,
-
-        time:
-            Date.now()
-
-    }
-
-    return finalNews
-
-}
-
-
-// ==========================================
-// تفاصيل الخبر - FAST + CACHE
-// ==========================================
-
-async function getNewsDetail(url) {
-
-    const cached =
-        detailCache.get(url)
-
-    if (
-        cached &&
-        Date.now() - cached.time <
-        DETAIL_CACHE_TIME
-    ) {
-
-        return cached.data
-
-    }
-
-    try {
-
-        const res =
-            await fetch(url, {
-
-                headers: {
-
-                    'User-Agent':
-                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
-
-                    'Accept':
-                        'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-
-                },
-
-                signal:
-                    AbortSignal.timeout(
-                        DETAIL_TIMEOUT
-                    )
-
-            })
-
-        if (!res.ok) {
-
-            throw new Error(
-                `HTTP ${res.status}`
-            )
-
-        }
-
-        const html =
-            await res.text()
-
-        // ==========================================
-        // العنوان
-        // ==========================================
-
-        let title =
-            html.match(
-                /<title[^>]*>([\s\S]*?)<\/title>/i
-            )?.[1] ||
-            'No Title'
-
-        title =
-            decodeHTMLEntities(
-                cleanHTML(title)
-            )
-                .replace(
-                    /\s*-\s*Hespress\s*$/i,
-                    ''
-                )
-                .replace(
-                    /\s*-\s*LE360\s*$/i,
-                    ''
-                )
-                .trim()
-
-        // ==========================================
-        // الكاتب
-        // ==========================================
-
-        let author =
-            html.match(
-                /<meta[^>]+name=["']author["'][^>]+content=["']([^"']+)["']/i
-            )?.[1] ||
-            'غـيـر مـعـروف'
-
-        author =
-            decodeHTMLEntities(
-                cleanHTML(author)
-            ).trim()
-
-        // ==========================================
-        // التاريخ
-        // ==========================================
-
-        let date =
-            html.match(
-                /property=["']article:published_time["'][^>]+content=["']([^"']+)["']/i
-            )?.[1] ||
-
-            html.match(
-                /content=["']([^"']+)["'][^>]+property=["']article:published_time["']/i
-            )?.[1] ||
-
-            ''
-
-        date =
-            date
-                ? formatDate(date)
-                : 'غـيـر مـتـوفـر'
-
-        // ==========================================
-        // التصنيف
-        // ==========================================
-
-        let category =
-            html.match(
-                /property=["']article:section["'][^>]+content=["']([^"']+)["']/i
-            )?.[1] ||
-            'عـام'
-
-        category =
-            decodeHTMLEntities(
-                cleanHTML(category)
-            ).trim()
-
-        // ==========================================
-        // محتوى الخبر
-        // ==========================================
-
-        let content = ''
-
-        const contentMatch =
-            html.match(
-                /class=["'][^"']*article-content[^"']*["'][\s\S]*?<\/div>/i
-            )
-
-        if (contentMatch) {
-
-            content =
-                contentMatch[0]
-
-        } else {
-
-            const paragraphs =
-                html.match(
-                    /<p[^>]*>[\s\S]*?<\/p>/gi
-                ) || []
-
-            content =
-                paragraphs
-                    .slice(0, 10)
-                    .join(' ')
-
-        }
-
-        content =
-            cleanHTML(content)
-
-        content =
-            decodeHTMLEntities(
-                content
-            )
-
-        if (!content) {
-
-            content =
-                'لـم يـتـم الـعـثـور عـلـى تـفـاصـيـل الـخـبـر.'
-
-        }
-
-        if (content.length > 1200) {
-
-            content =
-                content.slice(0, 1200) +
-                '...'
-
-        }
-
-        const result = {
-
-            title,
-
-            author,
-
-            date,
-
-            category,
-
-            content,
-
-            link: url
-
-        }
-
-        detailCache.set(
-            url,
-            {
-                data: result,
-                time: Date.now()
-            }
-        )
-
-        return result
-
-    } catch (e) {
-
-        console.error(
-            'News Detail Error:',
-            e.message
-        )
-
-        return null
-
-    }
-
-}
-
-
-// ==========================================
-// تنظيف XML
-// ==========================================
-
-function cleanXML(text) {
-
-    return String(text)
-
-        .replace(
-            /<!\[CDATA\[([\s\S]*?)\]\]>/g,
-            '$1'
-        )
-
-        .replace(
-            /<[^>]*>/g,
-            ''
-        )
-
-        .replace(
-            /\s+/g,
-            ' '
-        )
-
-        .trim()
-
-}
-
-
-// ==========================================
-// تنظيف HTML
-// ==========================================
-
-function cleanHTML(text) {
-
-    return String(text)
-
-        .replace(
-            /<script[\s\S]*?<\/script>/gi,
-            ''
-        )
-
-        .replace(
-            /<style[\s\S]*?<\/style>/gi,
-            ''
-        )
-
-        .replace(
-            /<noscript[\s\S]*?<\/noscript>/gi,
-            ''
-        )
-
-        .replace(
-            /<[^>]*>/g,
-            ' '
-        )
-
-        .replace(
-            /\s+/g,
-            ' '
-        )
-
-        .trim()
-
-}
-
-
-// ==========================================
-// التاريخ
-// ==========================================
-
-function formatDate(date) {
-
-    try {
-
-        const d =
-            new Date(date)
-
-        if (
-            isNaN(
-                d.getTime()
-            )
-        ) {
-            return date
-        }
-
-        return d.toLocaleString(
-            'ar-MA',
-            {
-
-                timeZone:
-                    'Africa/Casablanca',
-
-                year:
-                    'numeric',
-
-                month:
-                    '2-digit',
-
-                day:
-                    '2-digit',
-
-                hour:
-                    '2-digit',
-
-                minute:
-                    '2-digit'
-
-            }
-        )
-
-    } catch {
-
-        return date
-
-    }
-
-}
-
-
-// ==========================================
-// HTML Entities
-// ==========================================
-
-function decodeHTMLEntities(text) {
-
-    return String(text)
-
-        .replace(
-            /&amp;/g,
-            '&'
-        )
-
-        .replace(
-            /&quot;/g,
-            '"'
-        )
-
-        .replace(
-            /&#39;/g,
-            "'"
-        )
-
-        .replace(
-            /&apos;/g,
-            "'"
-        )
-
-        .replace(
-            /&lt;/g,
-            '<'
-        )
-
-        .replace(
-            /&gt;/g,
-            '>'
-        )
-
-        .replace(
-            /&#(\d+);/g,
-            (_, dec) =>
-                String.fromCharCode(
-                    Number(dec)
-                )
-        )
-
-        .replace(
-            /&#x([0-9a-f]+);/gi,
-            (_, hex) =>
-                String.fromCharCode(
-                    parseInt(hex, 16)
-                )
-        )
-
-              }
