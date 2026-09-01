@@ -1,46 +1,42 @@
 import { watchFile, unwatchFile } from 'fs';
 import chalk from 'chalk';
 import { fileURLToPath } from 'url';
+import { Button, ButtonV2,Carousel, AIRich } from './lib/MessageBuilder.js';
 
-global.pairingNumber = 21271559796;
-global.owner = [['212698498657', '𝗠𝗬𝗦𝗧𝗢 𝗢𝗙𝗙', true]];
+global.Button = Button;
+global.ButtonV2 = ButtonV2;
+global.Carousel = Carousel;
+global.AIRich = AIRich;
+
+global.pairingNumber = 212715597986;
+global.owner = [
+  ['212713030211', '𝗠𝗬𝗦𝗧𝗢 𝗢𝗙𝗙', true],
+  ['212698498657', '𝗠𝗬𝗦𝗧𝗢 𝗢𝗙𝗙', true],
+];
 
 global.namebot = '𝗕𝗬 𝗝𝗜𝗧𝗢𝗦𝗦𝗔 𝗕𝗢𝗧';
 global.author = '';
 global.source = 'https://whatsapp.com/channel/0029VbCxraN7T8bbAyc2j31J';
 
-global.wait = 'جــاري تـحـمـيل...';
-global.eror = 'وقـــع خـطـــــأ...';
-
-/* ============== BOT MODE ============== */
-/*
- * true  = البوت يخدم غير فالخاص
- * false = البوت يخدم فالخاص والمجموعات
- */
-global.privateOnly = true;
-
-/* ============== PAKASIR ============== */
+global.wait = 'جـاري الانتــظــار';
+global.eror = 'وقـــع خـطــأ';
 
 global.pakasir = {
 	slug: 'kilersbotz',
 	apikey: 'bWDO2M8GcfruzXscdKNQJC3vw8Y8PV13',
-	expired: 30,
+	expired: 30, //1 = 1menit. 30 = 30menit
 };
 
-/* ============== STICKER ============== */
-
-global.stickpack = 'Croted By';
+global.stickpack = 'Created By';
 global.stickauth = namebot;
 
-global.multiplier = 38;
+global.multiplier = 38; // The higher, The harder levelup
 
-/* ============== EMOJI ============== */
-
+/*============== EMOJI ==============*/
 global.rpg = {
 	emoticon(string) {
-		string = String(string).toLowerCase();
-
-		const emot = {
+		string = string.toLowerCase();
+		let emot = {
 			level: '📊',
 			limit: '🎫',
 			health: '❤️',
@@ -56,7 +52,7 @@ global.rpg = {
 			legendary: '🗃️',
 			superior: '💼',
 			pet: '🔖',
-			trash: '🗑️',
+			trash: '🗑',
 			armor: '🥼',
 			sword: '⚔️',
 			pickaxe: '⛏️',
@@ -74,27 +70,17 @@ global.rpg = {
 			emerald: '❇️',
 			upgrader: '🧰',
 		};
-
-		const results = Object.keys(emot)
-			.map(v => [v, new RegExp(v, 'gi')])
-			.filter(v => v[1].test(string));
-
+		let results = Object.keys(emot)
+			.map((v) => [v, new RegExp(v, 'gi')])
+			.filter((v) => v[1].test(string));
 		if (!results.length) return '';
-
-		return emot[results[0][0]];
+		else return emot[results[0][0]];
 	},
 };
 
-/* ============== AUTO RELOAD ============== */
-
-const file = fileURLToPath(import.meta.url);
-
+let file = fileURLToPath(import.meta.url);
 watchFile(file, () => {
 	unwatchFile(file);
-
-	console.log(
-		chalk.redBright("Update 'config.js'")
-	);
-
+	console.log(chalk.redBright("Update 'config.js'"));
 	import(`${file}?update=${Date.now()}`);
 });
