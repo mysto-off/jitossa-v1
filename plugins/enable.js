@@ -75,7 +75,7 @@ let handler = async (m, { conn, usedPrefix: _p, command, args, isOwner }) => {
 
 		return await conn.sendButton(m.chat, {
             image: { url: BANNER },
-            caption: `╮──〔 ⚙️ لــوحــة الإعــدادات 〕──╭\n│اخـتـر الـمـيـزة لـتـشـغـيـلـهـا أو تـعـطـيـلـهـا\n╯────────────────╰\n\n𝗕𝘆 𝗮𝗱𝗮𝗺.___.𝟵𝟴`,
+            caption: `╮──〔 ⚙️ لــوحــة الإعــدادات 〕──╭\n│اخـتـر الـمـيـزة لـتـشـغـيـلـهـا أو تـعـطـيـلـهـا\n╯────────────────╰\n\n𝗠𝗬𝗦𝗧𝗢 𝗢𝗙𝗙`,
             footer: { text: `` },
             buttons: [
                 { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '⚡ اخـتـر الـعـمـلـيـة', sections: sections }) },
