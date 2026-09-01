@@ -2,7 +2,7 @@ import moment from 'moment-timezone'
 
 const channelName = '𝗝𝗜𝗧𝗢𝗦𝗔 𝗕𝗢𝗧 🇲🇦'
 const CHANNEL_ID = '120363410733859643@newsletter'
-const DEVELOPER_NUMBER = '212698498657' // <-- حط رقمك هنا بلا +
+const DEVELOPER_NUMBER = '212698498657'
 
 const newsletter = {
     forwardingScore: 999,
@@ -109,11 +109,8 @@ const handler = async (m, { conn, usedPrefix: _p, args, command }) => {
 ╯────────────────╰
 
 ╮──〔 🎯 قـسـم الـتـرفـيـه 〕──╭
-│🎯 *${_p}لـعـبـة_قـمـار*
-╯────────────────╰
-
-╮──〔 📦 قـسـم الـتـنـصـيـب 〕──╭
-│📦 *${_p}تـنـصـيـب*
+│🎯 *${_p}اكـس_او*
+│🎯 *${_p}ديـناصـور*
 ╯────────────────╰
 
 ╮──〔 🛠️ قـسـم الادوات 〕──╭
@@ -152,8 +149,10 @@ const handler = async (m, { conn, usedPrefix: _p, args, command }) => {
             الاخبار: `╮──〔 📰 قـسـم الاخـبـار 〕──╭\n│📰 *${_p}اخـبـار_الـجـزيـرة*\n│📰 *${_p}اخـبـار_الـمـغـرب*\n╯────────────────╰`,
             الطقس: `╮──〔 🌤️ قـسـم الـطـقـس 〕──╭\n│🌤️ *${_p}حـالـة_الـطـقـس*\n╯────────────────╰`,
             الديني: `╮──〔 🌙 قـسـم الـديـنـي 〕──╭\n│🌙 *${_p}اوقـات_الـصـلاة*\n│🌙 *${_p}صـوت_الـقـرآن*\n│🌙 *${_p}قـرآن*\n╯────────────────╰`,
-            الترفيه: `╮──〔 🎯 قـسـم الـتـرفـيـه 〕──╭\n│🎯 *${_p}لـعـبـة_قـمـار*\n╯────────────────╰`,
-            خاصالتنصيب: `╮──〔 📦 قـسـم الـتـنـصـيـب 〕──╭\n│📦 *${_p}تـنـصـيـب*\n╯────────────────╰`
+            الترفيه: `╮──〔 🎯 قـسـم الـتـرفـيـه 〕──╭
+│🎯 *${_p}اكـس_او*
+│🎯 *${_p}ديـناصـور*
+╯────────────────╰`,
         }
 
         if (category && menus[category]) {
@@ -182,7 +181,7 @@ const handler = async (m, { conn, usedPrefix: _p, args, command }) => {
             return await conn.sendButton(m.chat, {
                 image: { url: BANNER },
                 caption: caption,
-                footer: { text: `𝗕𝗬 𝗠𝗬𝗦𝗧𝗢 𝗢𝗙𝗙` },
+                footer: { text: `𝗕𝗬 𝗠𝗬𝗦𝗧𝗢 𝗢𝗙` },
                 buttons: [
                     {name: 'quick_reply', buttonParamsJson: JSON.stringify({display_text: '🏠 الـرجـوع', id: _p + 'الأوامر'})}
                 ],
@@ -222,8 +221,7 @@ const handler = async (m, { conn, usedPrefix: _p, args, command }) => {
                     {title: "🌤️┊ الـقــســم الـتـاسـع", description: "🎧 ┊「 قــســم الـطـقـس 」", id: _p + "الأوامرالطقس"},
                     {title: "🌙┊ الـقــســم الـعـاشـر", description: "🕋 ┊「 قــســم الـديـنــي 」", id: _p + "الأوامرالديني"},
                     {title: "🎯┊ الـقــســم الـحـادي عـشـر", description: "🕸️ ┊「 قــســم الـتـرفـيـه 」", id: _p + "الأوامرالترفيه"},
-                    {title: "📦┊ الـقــســم الثـانـي عـشـر", description: "👾 ┊「 قــســم التـنصــيـب 」", id: _p + "الأوامرخاصالتنصيب"},
-                    {title: "⚡┊ الـقــســم الثـالـث عـشـر", description: "⚡ ┊「 قــســم الأدوات 」", id: _p + "الأوامراخرى"}
+                    {title: "⚡┊ الـقــســم الثـانـي عـشـر", description: "⚡ ┊「 قــســم الأدوات 」", id: _p + "الأوامراخرى"}
                 ]
             }
         ]
@@ -231,7 +229,7 @@ const handler = async (m, { conn, usedPrefix: _p, args, command }) => {
         await conn.sendButton(m.chat, {
             image: { url: BANNER },
             caption: caption,
-            footer: { text: `𝗕𝗬 𝗠𝗬𝗦𝗧𝗢 𝗢𝗙𝗙` },
+            footer: { text: `𝗕𝗬 𝗠𝗬𝗦𝗧𝗢 𝗢𝗙` },
             buttons: [
                 { name: 'single_select', buttonParamsJson: JSON.stringify({ title: '🗂️ الأقــســام الرئــيـســية', sections: sections }) },
                 { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '⭐ تـقـيــيـم الـبـوت', id: _p + 'rate' }) },
@@ -250,5 +248,5 @@ const handler = async (m, { conn, usedPrefix: _p, args, command }) => {
 
 handler.help = ['الأوامر', 'menu', 'اوامر']
 handler.tags = ['main']
-handler.command = /^(الأوامر|اوامر|menu|pp|الأوامرالكل|الأوامرالتحميل|الأوامرالبحث|الأوامرالذكاء|الأوامرالصور|الأوامرادارةالمجموعة|الأوامرالمطور|الأوامرالابلاغ|الأوامرالاخبار|الأوامرالطقس|الأوامرالديني|الأوامرالترفيه|الأوامرخاصالتنصيب|الأوامراخرى)$/i
+handler.command = /^(الأوامر|اوامر|menu|bb|الأوامرالكل|الأوامرالتحميل|الأوامرالبحث|الأوامرالذكاء|الأوامرالصور|الأوامرادارةالمجموعة|الأوامرالمطور|الأوامرالابلاغ|الأوامرالاخبار|الأوامرالطقس|الأوامرالديني|الأوامرالترفيه|الأوامراخرى)$/i
 export default handler
