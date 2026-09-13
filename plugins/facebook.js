@@ -1,14 +1,10 @@
-/*
-Facebook Downloader
-Scrape Source: https://whatsapp.com/channel/0029VbBJKfE0gcfCAJZEVh3R/125
-*/
+// ============== Facebook Downloader Simple ==============
 import axios from "axios";
 
 // ===== معلومات القناة =====
 const channelName = '𝗝𝗜𝗧𝗢𝗦𝗦𝗔 𝗕𝗢𝗧 🇲🇦'
 const CHANNEL_ID = '120363410733859643@newsletter'
-const INSTAGRAM_URL = `https://instagram.com/mysto__off`
-const DEVELOPER = '*𝗠𝗬𝗦𝗧𝗢 𝗢𝗙𝗙*'
+const INSTAGRAM_URL = `https://www.instagram.com/mysto__off`
 const newsletter = {
     forwardingScore: 999,
     isForwarded: true,
@@ -65,7 +61,7 @@ async function fbDownloader(fbUrl) {
     }
   );
 
-  if (!data ||!data.data) throw new Error("Failed to retrieve video data");
+  if (!data || !data.data) throw new Error("Failed to retrieve video data");
 
   const html = data.data;
   const results = [];
@@ -74,7 +70,7 @@ async function fbDownloader(fbUrl) {
     /<td class="video-quality">(.*?)<\/td>[\s\S]*?(?:href="(.*?)"|data-videourl="(.*?)")/g;
 
   let match;
-  while ((match = rowRegex.exec(html))!== null) {
+  while ((match = rowRegex.exec(html)) !== null) {
     const quality = match[1].trim();
     const url = match[2] || match[3];
     if (quality && url) results.push({ quality, url });
@@ -83,71 +79,54 @@ async function fbDownloader(fbUrl) {
   return results;
 }
 
-let handler = async (m, { conn, text, usedPrefix, command }) => {
-  if (!text)
-    return conn.sendMessage(m.chat, {
-      text: `*📥 تـحـميـل فـيـديـوهـات فيـسبـوك*\n\n📌 *الامـر:* \`${usedPrefix + command} لـيـنـك\`\n💡 *مـثـال:* \`${usedPrefix + command} https://facebook.com/watch?v=xxx\``,
-      contextInfo: newsletter
-    }, { quoted: m })
+let handler = async (m, { conn, args, usedPrefix, command }) => {
 
-  await conn.sendMessage(m.chat, { react: { text: '⏳', key: m.key } });
-  await conn.sendMessage(m.chat, { text: `*⏱️ انتــظــر ثــوانــــي*\n\n🔍 يـتـم جـلـب الـمـيـديـا... ⏳`, contextInfo: newsletter }, { quoted: m })
+    if (!args[0]) {
+        return conn.sendMessage(m.chat, {
+            text: `*📥 تـحـميـل فـيـديـوهـات فيـسبـوك*\n\n📌 *الامـر:* \`${usedPrefix + command} لـيـنـك\`\n💡 *مـثـال:* \`${usedPrefix + command} https://facebook.com/watch?v=xxx\``,
+            contextInfo: newsletter
+        }, { quoted: m })
+    }
 
-  try {
-    const results = await fbDownloader(text);
+    await conn.sendMessage(m.chat, { react: { text: '⏳', key: m.key } });
 
-    if (!results.length)
-      throw new Error("مـا تـلـقـاش الـفـيـديـو");
-
-    const videoUrl = results[0].url;
-    const quality = results[0].quality
-
-    const { data: buffer } = await axios.get(videoUrl, {
-      responseType: "arraybuffer"
-    });
-
-    await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } });
-
-    // نفس الكابتشن ديال ig
-    let caption = `*📥 تـم تـحمـيل بـنـجـاح*
-
-*📀 الـعـنـوان :* Facebook Video
-*👤 مـطـور :* ${DEVELOPER}
-*🔗 الـرابـط :* ${text}
-*🎞️ الـجـودة :* ${quality}`
-
-    await conn.sendMessage(
-      m.chat,
-      {
-        video: buffer,
-        caption: caption,
-        footer: `❀ بـواسـطـة ${channelName} ❀`,
-        buttons: [
-          {
-            name: 'cta_url',
-            buttonParamsJson: JSON.stringify({
-              display_text: '📷 اضـغـطـونـا لـمـتـابـعـة الـحـسـاب ديـالـي',
-              url: INSTAGRAM_URL
-            }),
-          },
-        ],
-        contextInfo: newsletter
-      },
-      { quoted: m }
-    );
-  } catch (e) {
-    console.error('FB Error:', e);
-    await conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } });
+    // نفس منطق الـig
     await conn.sendMessage(m.chat, {
-      text: `*📥 تـحـميـل فـيـديـوهـات فيـسـبوك*\n\n❌ خـطـا: ${e.message || e}`,
-      contextInfo: newsletter
+        text: `*🔍 يـتـم تحـمـل الفـيديـو مــن فيـسبـوك*\n\n*📌 تـابـع حـسـابـي استـغـرام*\n\n${INSTAGRAM_URL}`,
+        contextInfo: newsletter
     }, { quoted: m })
-  }
-};
+
+    try {
+        const results = await fbDownloader(args[0]);
+
+        if (!results.length)
+            throw new Error("مـا تـلـقـاش الـفـيـديـو");
+
+        const videoUrl = results[0].url;
+
+        await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } });
+
+        // بدون اي معلومات ديال الفيديو، بحال ig
+        await conn.sendMessage(m.chat, {
+            video: { url: videoUrl },
+            caption: `*تـم تحـمـيل الفـيديـو بنـجــاح من فيـسبـوك 🌟🎉*`,
+            footer: `❀ بـواسـطـة ${channelName} ❀`,
+            contextInfo: newsletter
+        }, { quoted: m });
+
+    } catch (e) {
+        console.error('FB Error:', e);
+        await conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } });
+        await conn.sendMessage(m.chat, {
+            text: `*❌ وقع خطأ:* ${e.message || e}`,
+            contextInfo: newsletter
+        }, { quoted: m })
+    }
+}
 
 handler.help = ["fb <url>"];
 handler.tags = ["downloader"];
-handler.command = /^fb|فيسبوك|fbdl$/i;
+handler.command = /^(fb|فيسبوك|fbdl)$/i;
 handler.limit = false;
 
 export default handler;
