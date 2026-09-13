@@ -1,4 +1,4 @@
-// ============== Instagram Downloader ==============
+// ============== Instagram Downloader Simple ==============
 import axios from 'axios';
 
 const DOWNREELS_API = "https://downreels.com/api/fetch.php"
@@ -12,10 +12,9 @@ const HEADERS = {
 }
 
 // ===== معلومات القناة =====
-const channelName = '𝗝𝗜𝗧𝗢𝗦𝗦𝗔 𝗕𝗢𝗧 🇲🇦'
+const channelName = '𝗝𝗜𝗧𝗢𝗦𝗔 𝗕𝗢𝗧 🇲🇦'
 const CHANNEL_ID = '120363410733859643@newsletter'
-const INSTAGRAM_URL = `https://instagram.com/adam.__.98`
-const DEVELOPER = '*𝗠𝗬𝗦𝗧𝗢 𝗢𝗙𝗙*' // زدنا هادي
+const INSTAGRAM_URL = `https://www.instagram.com/mysto__off`
 const newsletter = {
     forwardingScore: 999,
     isForwarded: true,
@@ -36,7 +35,12 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     }
 
     await conn.sendMessage(m.chat, { react: { text: '⏳', key: m.key } });
-    await conn.sendMessage(m.chat, { text: `*⏱️ انتــظــر ثــوانــــي*\n\n🔍 يـتـم جـلـب الـمـيـديـا... ⏳`, contextInfo: newsletter }, { quoted: m })
+
+    // الرسالة اللي طلبتي
+    await conn.sendMessage(m.chat, {
+        text: `*🔍 يـتـم تحـمـل الفـيديـو مــن اسـتغــرام*\n\n*📌 تـابـع حـسـابـي استـغـرام*\n\n${INSTAGRAM_URL}`,
+        contextInfo: newsletter
+    }, { quoted: m })
 
     try {
         const response = await axios.post(DOWNREELS_API, { url: args[0] }, { headers: HEADERS, timeout: 30000 });
@@ -55,37 +59,17 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
         if (data.videos.length === 1) {
             let downloadUrl = getBestVideo(data.videos);
-            let title = data.title || data.desc || 'Instagram Reel'
 
-            // الكابتشن الجديد بحال ما بغيتي
-            let caption = `*📥 تـم تـحـمـيـل بنـجـاح*
-
-*📀 الـعـنـوان :* ${title}
-*👤 مـطـور :* ${DEVELOPER}
-*🔗 الـرابـط :* ${args[0]}`
-
+            // بدون اي معلومات ديال الفيديو
             await conn.sendMessage(m.chat, {
                 video: { url: downloadUrl },
-                caption: caption,
+                caption: `*تـم تحـمـيل الفـيديـو بنـجــاح من اسـتغـرام 💚🐱*`,
                 footer: `❀ بـواسـطـة ${channelName} ❀`,
-                buttons: [
-                    {
-                        name: 'cta_url',
-                        buttonParamsJson: JSON.stringify({
-                            display_text: '📷 اضـغـطـونـا لـمـتـابـعـة الـحـسـاب ديـالـي',
-                            url: INSTAGRAM_URL
-                        }),
-                    },
-                ],
                 contextInfo: newsletter
             }, { quoted: m });
 
-        } else if (data.videos.length > 1) {
-            await conn.sendMessage(m.chat, {
-                text: `*⏱️ انتــظــر ثــوانــــي*\n\n📁 تـم الـعـثـور عـلـى ألـبـوم فـيـه (${data.videos.length}) مـلـفـات\nجـاري الارسـال...`,
-                contextInfo: newsletter
-            }, { quoted: m })
-
+        } else {
+            // الا كان البوم غادي يصيفطهم كاملين بلا كابتشن
             for (const item of data.videos) {
                 if (item.isVideo) {
                     await conn.sendMessage(m.chat, { video: { url: item.url }, contextInfo: newsletter }, { quoted: m });
@@ -94,17 +78,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
                 }
             }
             await conn.sendMessage(m.chat, {
-                text: `*تـم الارسـال بـنـجـاح ✅*`,
-                footer: `❀ بـواسـطـة ${channelName} ❀`,
-                buttons: [
-                    {
-                        name: 'cta_url',
-                        buttonParamsJson: JSON.stringify({
-                            display_text: '📷 اضـغـطـونـا لـمـتـابـعـة الـحـسـاب ديـالـي',
-                            url: INSTAGRAM_URL
-                        }),
-                    },
-                ],
+                text: `*تـم تحـمـيل الفـيديـو بنـجــاح من اسـتغـرام 💚🐱*`,
                 contextInfo: newsletter
             }, { quoted: m })
         }
@@ -113,14 +87,14 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         console.error('Downreels Error Log:', e);
         await conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } });
         await conn.sendMessage(m.chat, {
-            text: `*📥 تـحـميـل فـيـديـوهـات انـستـغرام*\n\n❌ خـطـا: ${e.message || e}`,
+            text: `*❌ وقع خطأ:* ${e.message || e}`,
             contextInfo: newsletter
         }, { quoted: m })
     }
 }
 
-handler.help = ['insta <url>'];
+handler.help = ['ig <url>'];
 handler.tags = ['downloader'];
-handler.command = /^(insta|استغرام|ig|)$/i;
+handler.command = /^(ig|استغرام|insta)$/i;
 handler.limit = false
 export default handler;
