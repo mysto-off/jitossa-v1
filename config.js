@@ -10,7 +10,7 @@ global.AIRich = AIRich;
 
 global.pairingNumber = 212607244917;
 global.owner = [
-  ['212713030211', '𝗠𝗬𝗦𝗧𝗢 𝗢𝗙𝗙', true],
+  ['212719213202', '𝗠𝗬𝗦𝗧𝗢 𝗢𝗙𝗙', true],
   ['212698498657', '𝗠𝗬𝗦𝗧𝗢 𝗢𝗙𝗙', true],
 ];
 
